@@ -1,98 +1,117 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { supabase } from '../../lib/supabase';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Dashboard() {
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [totalIn, setTotalIn] = useState(0); // Lacagta kugu maqan
+  const [totalOut, setTotalOut] = useState(0); // Lacagta lagaa leeyahay
 
-export default function HomeScreen() {
+  useEffect(() => {
+    getProfile();
+  }, []);
+
+  async function getProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserProfile(user.user_metadata);
+    }
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.welcomeText}>Soo dhawaaw,</Text>
+            <Text style={styles.userName}>{userProfile?.full_name || 'User'}</Text>
+          </View>
+          <TouchableOpacity style={styles.notifButton}>
+            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
+          </TouchableOpacity>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* Balance Card */}
+        <View style={styles.mainCard}>
+          <Text style={styles.cardLabel}>Wadarta Guud</Text>
+          <Text style={styles.totalAmount}>${totalIn - totalOut}</Text>
+          
+          <View style={styles.row}>
+            <View style={styles.statItem}>
+              <Ionicons name="arrow-down-circle" size={20} color="#10B981" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.statLabel}>Kugu Maqan</Text>
+                <Text style={styles.statAmount}>${totalIn}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.divider} />
+
+            <View style={styles.statItem}>
+              <Ionicons name="arrow-up-circle" size={20} color="#EF4444" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.statLabel}>Lagaa Leeyahay</Text>
+                <Text style={styles.statAmount}>${totalOut}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Recent Transactions Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Deymihii ugu dambeeyay</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAll}>Arag dhamaantood</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Liiska wuxuu soo baxayaa markaan dhisno Table-ka Database-ka */}
+        <View style={styles.emptyState}>
+          <Ionicons name="receipt-outline" size={50} color="#CBD5E1" />
+          <Text style={styles.emptyText}>Weli wax deyn ah ma diiwaangashan.</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingVertical: 20 
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  welcomeText: { fontSize: 14, color: '#64748B' },
+  userName: { fontSize: 22, fontWeight: 'bold', color: '#1E293B' },
+  notifButton: { backgroundColor: '#fff', padding: 10, borderRadius: 12, elevation: 2 },
+  mainCard: { 
+    backgroundColor: '#1E293B', 
+    margin: 20, 
+    borderRadius: 24, 
+    padding: 25, 
+    elevation: 5,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardLabel: { color: '#94A3B8', fontSize: 14, marginBottom: 5 },
+  totalAmount: { color: '#fff', fontSize: 36, fontWeight: '800', marginBottom: 25 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statItem: { flexDirection: 'row', alignItems: 'center' },
+  statLabel: { color: '#94A3B8', fontSize: 12 },
+  statAmount: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  divider: { width: 1, height: 30, backgroundColor: '#334155' },
+  sectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    marginTop: 10 
   },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
+  seeAll: { color: '#3B82F6', fontWeight: '600' },
+  emptyState: { alignItems: 'center', marginTop: 50 },
+  emptyText: { color: '#94A3B8', marginTop: 10, fontSize: 14 }
 });
