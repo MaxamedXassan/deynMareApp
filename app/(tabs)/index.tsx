@@ -2,24 +2,35 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react'; // Waxaan ku daray useMemo
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput // Waxaan ku daray TextInput
-  ,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 
+// 1. Soo jiid useTheme hook-ga
+import { useTheme } from '../context/ThemeContext';
+
+interface Contact {
+  id: string;
+  contact_name: string;
+  contact_phone: string;
+  totalBalance: number;
+  debts?: any[];
+}
+
 export default function DebtsScreen() {
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState(''); // State-ka baaritaanka
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [totalAll, setTotalAll] = useState(0);
   const [userName, setUserName] = useState<string | null>('');
   const [loading, setLoading] = useState(true);
@@ -27,8 +38,11 @@ export default function DebtsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
+  // 2. Hel theme-ka guud ee App-ka
+  const { theme, isDark } = useTheme();
+
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       loadData();
     }, [])
   );
@@ -36,7 +50,7 @@ export default function DebtsScreen() {
   const loadData = async () => {
     const state = await NetInfo.fetch();
     setIsOffline(!state.isConnected);
-
+    setSearchQuery('');
     if (state.isConnected) {
       fetchFromSupabase();
     } else {
@@ -56,14 +70,15 @@ export default function DebtsScreen() {
 
       const { data, error } = await supabase
         .from('contacts')
-        .select(`id, contact_name, contact_phone, debts (amount, type)`) // Ku dar 'type' si xisaabtu u saxanto
+        .select(`id, contact_name, contact_phone, debts (amount, type)`)
         .eq('user_id', user?.id);
+
+      if (error) throw error;
 
       if (data) {
         let overallTotal = 0;
-        const formatted = data.map(c => {
+        const formatted: Contact[] = data.map((c: any) => {
           let contactTotal = 0;
-          // Halkan waxaan ku saxay xisaabta (Plus/Minus)
           c.debts?.forEach((d: any) => {
              if(d.type === 'kugu_maqan') contactTotal += parseFloat(d.amount);
              else contactTotal -= parseFloat(d.amount);
@@ -80,7 +95,7 @@ export default function DebtsScreen() {
         await AsyncStorage.setItem('cached_user_name', userName || '');
       }
     } catch (e) {
-      console.log(e);
+      console.log("Fetch Error:", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,14 +108,41 @@ export default function DebtsScreen() {
     const cachedName = await AsyncStorage.getItem('cached_user_name');
 
     if (cachedData) setContacts(JSON.parse(cachedData));
-    if (cachedTotal) setTotalAll(parseFloat(cachedTotal));
+    if (cachedTotal) setTotalAll(parseFloat(cachedTotal || '0'));
     if (cachedName) setUserName(cachedName);
     
     setLoading(false);
     setRefreshing(false);
   };
 
-  // Habka baaritaanka (Loo sifeeyay Magac iyo Lambar)
+  const handleDeleteContact = (contactId: string, contactName: string) => {
+    if (isOffline) {
+      Alert.alert("Error", "Macmiilka ma tirtiri kartid adigoo Offline ah.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete",
+      `Ma hubtaa inaad tirtirayso ${contactName}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+              if (error) throw error;
+              fetchFromSupabase();
+            } catch (e: any) {
+              Alert.alert("Khalad", e.message);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
       const nameMatch = contact.contact_name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -110,20 +152,22 @@ export default function DebtsScreen() {
   }, [searchQuery, contacts]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header Section */}
+    // 3. Isticmaal theme.background
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      
+      {/* Header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.userGreeting}>Ku soo dhawaaw,</Text>
-          <Text style={styles.userNameText}>{userName}</Text>
+          <Text style={[styles.userGreeting, { color: theme.subText }]}>Ku soo dhawaaw,</Text>
+          <Text style={[styles.userNameText, { color: theme.text }]}>{userName}</Text>
         </View>
         <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/settings')}>
-          <Ionicons name="person-circle-outline" size={38} color="#1E293B" />
+          <Ionicons name="person-circle-outline" size={38} color={theme.text} />
         </TouchableOpacity>
       </View>
 
       {/* Hero Card */}
-      <View style={styles.heroCard}>
+      <View style={[styles.heroCard, { backgroundColor: theme.primary }]}>
         <Text style={styles.heroLabel}>Wadarta Lacagta Maqan</Text>
         <Text style={styles.heroAmount}>${totalAll.toLocaleString()}</Text>
         <View style={styles.heroBadge}>
@@ -131,71 +175,79 @@ export default function DebtsScreen() {
         </View>
       </View>
 
-      {/* --- SEARCH BAR --- */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#94A3B8" />
+        <View style={[styles.searchBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Ionicons name="search" size={20} color={theme.subText} />
           <TextInput
             placeholder="Raadi macmiil ama lambar..."
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.text }]}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.subText}
           />
           {searchQuery !== '' && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+              <Ionicons name="close-circle" size={20} color={theme.subText} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Macaamiisha</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Macaamiisha</Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
+      {loading && !refreshing ? (
+        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 50 }} />
       ) : (
         <FlatList
-          data={filteredContacts} // Waxaan isticmaalnay liiska la sifeeyay
+          data={filteredContacts}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={loadData} color="#3B82F6" />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={loadData} 
+              colors={[theme.primary]} 
+              tintColor={theme.primary} 
+            />
           }
           renderItem={({ item }) => (
             <TouchableOpacity 
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.card }]}
               onPress={() => router.push({ 
                 pathname: "/contact-details", 
                 params: { id: item.id, name: item.contact_name, phone: item.contact_phone } 
               })}
+              onLongPress={() => handleDeleteContact(item.id, item.contact_name)}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.contact_name[0].toUpperCase()}</Text>
+              <View style={[styles.avatar, { backgroundColor: isDark ? '#334155' : '#EFF6FF' }]}>
+                <Text style={[styles.avatarText, { color: theme.primary }]}>{item.contact_name[0].toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1, marginLeft: 15 }}>
-                <Text style={styles.contactName}>{item.contact_name}</Text>
-                <Text style={styles.contactPhone}>{item.contact_phone || 'No phone'}</Text>
+                <Text style={[styles.contactName, { color: theme.text }]}>{item.contact_name}</Text>
+                <Text style={[styles.contactPhone, { color: theme.subText }]}>{item.contact_phone || 'Lambar ma laha'}</Text>
               </View>
               <View style={styles.amountContainer}>
                 <Text style={[styles.contactAmount, { color: item.totalBalance >= 0 ? '#10B981' : '#EF4444' }]}>
                   ${item.totalBalance.toFixed(2)}
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                <Ionicons name="chevron-forward" size={16} color={theme.subText} />
               </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 40 }}>
-              <Text style={{ color: '#94A3B8' }}>Lama helin macmiil waafaqsan raadintaada.</Text>
+              <Text style={{ color: theme.subText }}>
+                {searchQuery ? 'Macmiilkaas lama helin.' : 'Ma jiro macmiil kuu diiwaangashan.'}
+              </Text>
             </View>
           }
         />
       )}
 
-      {/* Floating Action Button */}
+      {/* FAB Button */}
       <TouchableOpacity 
-        style={styles.fab} 
+        style={[styles.fab, { backgroundColor: isDark ? theme.primary : '#1E293B' }]} 
         onPress={() => router.push('/add-contact')}
       >
         <Ionicons name="add" size={32} color="#fff" />
@@ -205,39 +257,26 @@ export default function DebtsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
-  userGreeting: { fontSize: 13, color: '#64748B' },
-  userNameText: { fontSize: 20, fontWeight: 'bold', color: '#1E293B' },
+  userGreeting: { fontSize: 13 },
+  userNameText: { fontSize: 20, fontWeight: 'bold' },
   profileBtn: { paddingLeft: 10 },
-  heroCard: { backgroundColor: '#3B82F6', marginHorizontal: 20, marginBottom: 15, padding: 25, borderRadius: 30, alignItems: 'center', elevation: 5 },
+  heroCard: { marginHorizontal: 20, marginBottom: 15, padding: 25, borderRadius: 30, alignItems: 'center', elevation: 5 },
   heroLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
   heroAmount: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginVertical: 8 },
   heroBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  
-  // Search Styles
   searchContainer: { paddingHorizontal: 20, marginBottom: 20 },
-  searchBox: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#fff', 
-    paddingHorizontal: 15, 
-    borderRadius: 18, 
-    height: 55,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    elevation: 1
-  },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#1E293B' },
-
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginLeft: 22, marginBottom: 15 },
-  card: { flexDirection: 'row', backgroundColor: '#fff', padding: 15, borderRadius: 20, marginBottom: 12, alignItems: 'center', elevation: 1 },
-  avatar: { width: 50, height: 50, borderRadius: 16, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#3B82F6', fontWeight: 'bold', fontSize: 18 },
-  contactName: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
-  contactPhone: { fontSize: 13, color: '#64748B' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, borderRadius: 18, height: 55, borderWidth: 1, elevation: 1 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 22, marginBottom: 15 },
+  card: { flexDirection: 'row', padding: 15, borderRadius: 20, marginBottom: 12, alignItems: 'center', elevation: 1 },
+  avatar: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontWeight: 'bold', fontSize: 18 },
+  contactName: { fontSize: 16, fontWeight: 'bold' },
+  contactPhone: { fontSize: 13 },
   amountContainer: { alignItems: 'flex-end' },
   contactAmount: { fontSize: 16, fontWeight: 'bold' },
-  fab: { position: 'absolute', bottom: 30, right: 30, backgroundColor: '#1E293B', width: 65, height: 65, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8 }
+  fab: { position: 'absolute', bottom: 30, right: 30, width: 65, height: 65, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8 }
 });

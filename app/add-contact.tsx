@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -13,7 +12,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-// Kani waa SafeArea-ga saxda ah
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
@@ -24,14 +22,20 @@ export default function AddContact() {
   const router = useRouter();
 
   async function handleSave() {
+    // 1. Magaca oo qasab ah
     if (!name.trim()) {
       Alert.alert("Khalad", "Fadlan qor magaca macmiilka");
+      return;
+    }
+    
+    // 2. Taleefanka oo hadda qasab laga dhigay
+    if (!phone.trim()) {
+      Alert.alert("Khalad", "Fadlan qor lambarka taleefanka macmiilka");
       return;
     }
 
     setLoading(true);
     try {
-      // Isticmaalka getUser() waa midka ugu badbaadada badan
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) throw new Error("Fadlan dib u log-in garee.");
@@ -61,12 +65,14 @@ export default function AddContact() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
+          
+          {/* Header la hagaajiyay oo hal xariiq ah */}
+          {/* <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={26} color="#1E293B" />
+              <Text style={styles.headerTitle}>Ku Dar Macmiil</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Ku Dar Macmiil</Text>
-          </View>
+          </View> */}
 
           <View style={styles.card}>
             <Text style={styles.label}>Magaca Macmiilka</Text>
@@ -77,7 +83,7 @@ export default function AddContact() {
               style={styles.input} 
             />
 
-            <Text style={styles.label}>Taleefanka</Text>
+            <Text style={styles.label}>Taleefanka (Qasab)</Text>
             <TextInput 
               placeholder="61xxxxxxx" 
               value={phone} 
@@ -86,8 +92,16 @@ export default function AddContact() {
               keyboardType="phone-pad"
             />
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Keydi Macmiilka</Text>}
+            <TouchableOpacity 
+              style={[styles.saveBtn, { opacity: loading ? 0.7 : 1 }]} 
+              onPress={handleSave} 
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Keydi Macmiilka</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -98,11 +112,12 @@ export default function AddContact() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', marginLeft: 15 },
-  card: { backgroundColor: '#fff', padding: 25, borderRadius: 20, elevation: 3 },
+  header: { marginBottom: 25, marginTop: 10 },
+  backBtn: { flexDirection: 'row', alignItems: 'center' }, // Arrow-ga iyo Qoraalka isku xir
+  headerTitle: { fontSize: 20, fontWeight: 'bold', marginLeft: 12, color: '#1E293B' },
+  card: { backgroundColor: '#fff', padding: 25, borderRadius: 25, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
   label: { fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: '#475569' },
-  input: { backgroundColor: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 20, fontSize: 16 },
-  saveBtn: { backgroundColor: '#3B82F6', padding: 18, borderRadius: 15, alignItems: 'center' },
+  input: { backgroundColor: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 20, fontSize: 16, color: '#1E293B' },
+  saveBtn: { backgroundColor: '#3B82F6', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });
